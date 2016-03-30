@@ -62,11 +62,12 @@ namespace Microsoft.NodejsTools.Intellisense {
         private AnalysisQueue _analysisQueue;
         private readonly HashSet<BufferParser> _activeBufferParsers = new HashSet<BufferParser>();
         private readonly ConcurrentDictionary<string, ProjectItem> _projectFiles;
-        private JsAnalyzer _jsAnalyzer;
+        private readonly Lazy<JsAnalyzer> _jsAnalyzer;
         private readonly bool _implicitProject;
         private readonly AutoResetEvent _queueActivityEvent = new AutoResetEvent(false);
         private readonly CodeSettings _codeSettings = new CodeSettings();
         private readonly Dictionary<IReplEvaluator, BufferParser> _replParsers = new Dictionary<IReplEvaluator, BufferParser>();
+        private readonly Lazy<AnalysisLimits> _limits;
 
         /// <summary>
         /// This is used for storing cached analysis and is not valid for locating source files.
@@ -110,16 +111,19 @@ namespace Microsoft.NodejsTools.Intellisense {
                 _saveToDisk = true;
             }
 
-            var limits = LoadLimits();
-            if (projectFileDir != null) {
-                _projectFileDir = projectFileDir;
-                if (!LoadCachedAnalysis(limits)) {
-                    CreateNewAnalyzer(limits);
-                }
-            } else {
+            _projectFileDir = projectFileDir;
+            if (projectFileDir == null) {
                 _implicitProject = true;
-                CreateNewAnalyzer(limits);
             }
+
+            _limits = new Lazy<AnalysisLimits>(() => LoadLimits(_analysisLevel));
+            _jsAnalyzer = new Lazy<JsAnalyzer>(() => {
+                if (_projectFileDir != null) {
+                    return LoadCachedAnalysis(Limits) ?? CreateNewAnalyzer(Limits);
+                } else {
+                    return CreateNewAnalyzer(Limits);
+                }
+            });
 
             if (!_saveToDisk) {
                 DeleteAnalysis();
@@ -128,6 +132,18 @@ namespace Microsoft.NodejsTools.Intellisense {
             _userCount = 1;
 
             InitializeCodeSettings();
+        }
+
+        internal AnalysisLimits Limits {
+            get {
+                return _limits.Value;
+            }
+        }
+
+        private JsAnalyzer JsAnalyzer {
+            get {
+                return _jsAnalyzer.Value;
+            }
         }
 
         private void InitializeCodeSettings() {
@@ -140,7 +156,7 @@ namespace Microsoft.NodejsTools.Intellisense {
                 }
             }
 
-            foreach (var name in _jsAnalyzer.GlobalMembers) {
+            foreach (var name in JsAnalyzer.GlobalMembers) {
                 _codeSettings.AddKnownGlobal(name);
             }
             _codeSettings.AddKnownGlobal("__dirname");
@@ -151,12 +167,13 @@ namespace Microsoft.NodejsTools.Intellisense {
             _codeSettings.AllowShebangLine = true;
         }
 
-        private void CreateNewAnalyzer(AnalysisLimits limits) {
-            _jsAnalyzer = new JsAnalyzer(limits);
+        private JsAnalyzer CreateNewAnalyzer(AnalysisLimits limits) {
+            var jsAnalyzer = new JsAnalyzer(limits);
             if (ShouldEnqueue()) {
                 _analysisQueue = new AnalysisQueue(this);
             }
             _fullyLoaded = true;
+            return jsAnalyzer;
         }
 
         private bool ShouldEnqueue() {
@@ -302,7 +319,7 @@ namespace Microsoft.NodejsTools.Intellisense {
 
             ProjectItem item;
             if (!_projectFiles.TryGetValue(path, out item)) {
-                var pyEntry = _jsAnalyzer.AddModule(
+                var pyEntry = JsAnalyzer.AddModule(
                     path,
                     null
                 );
@@ -408,7 +425,7 @@ namespace Microsoft.NodejsTools.Intellisense {
 
             if (ShouldEnqueue()) {
                 _analysisQueue.Enqueue(
-                    _jsAnalyzer.AddPackageJson(path, mainFile, dependencies),
+                    JsAnalyzer.AddPackageJson(path, mainFile, dependencies),
                     AnalysisPriority.Normal
                 );
             }
@@ -641,16 +658,16 @@ namespace Microsoft.NodejsTools.Intellisense {
 
         public JsAnalyzer Project {
             get {
-                return _jsAnalyzer;
+                return JsAnalyzer;
             }
         }
 
         public int MaxLogLength {
             get {
-                if (_jsAnalyzer == null) {
+                if (JsAnalyzer == null) {
                     return 0;
                 }
-                return _jsAnalyzer.MaxLogLength;
+                return JsAnalyzer.MaxLogLength;
             }
             set {
                 if (!_fullyLoaded) {
@@ -662,13 +679,13 @@ namespace Microsoft.NodejsTools.Intellisense {
                     }
                 }
 
-                _jsAnalyzer.MaxLogLength = value;
+                JsAnalyzer.MaxLogLength = value;
             }
         }
 
         public void DumpLog(TextWriter output, bool asCsv = false) {
-            if (_jsAnalyzer != null) {
-                _jsAnalyzer.DumpLog(output, asCsv);
+            if (JsAnalyzer != null) {
+                JsAnalyzer.DumpLog(output, asCsv);
             } else {
                 output.WriteLine("Analysis loading...");
             }
@@ -800,7 +817,7 @@ namespace Microsoft.NodejsTools.Intellisense {
                             implicitItem.ImplicitLoadCount--;
                             if (implicitItem.ImplicitLoadCount == 0) {
                                 if (_analysisLevel != AnalysisLevel.NodeLsNone) {
-                                    _analysisQueue.Enqueue(_jsAnalyzer.RemoveModule(implicitItem.Entry), AnalysisPriority.Normal);
+                                    _analysisQueue.Enqueue(JsAnalyzer.RemoveModule(implicitItem.Entry), AnalysisPriority.Normal);
                                 }
                                 ProjectItem implicitRemoved;
                                 _projectFiles.TryRemove(implicitItem.Entry.FilePath, out implicitRemoved);
@@ -817,7 +834,7 @@ namespace Microsoft.NodejsTools.Intellisense {
 
             ClearParserTasks(entry);
             if (ShouldEnqueue()) {
-                _analysisQueue.Enqueue(_jsAnalyzer.RemoveModule(entry), AnalysisPriority.Normal);
+                _analysisQueue.Enqueue(JsAnalyzer.RemoveModule(entry), AnalysisPriority.Normal);
             }
             ProjectItem removed;
             _projectFiles.TryRemove(entry.FilePath, out removed);
@@ -842,7 +859,7 @@ namespace Microsoft.NodejsTools.Intellisense {
             var replEval = buffer.GetReplEvaluator();
             if (replEval != null) {
                 // We have a repl window, create an untracked module.
-                return _jsAnalyzer.AddModule(
+                return JsAnalyzer.AddModule(
                     Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "repl" + Guid.NewGuid() + ".js"),
                     analysisCookie
                 );
@@ -857,7 +874,7 @@ namespace Microsoft.NodejsTools.Intellisense {
             ProjectEntry entry;
             if (!_projectFiles.TryGetValue(path, out file)) {
                 if (buffer.ContentType.IsOfType(NodejsConstants.Nodejs)) {
-                    entry = _jsAnalyzer.AddModule(
+                    entry = JsAnalyzer.AddModule(
                         buffer.GetFilePath(),
                         analysisCookie
                     );
@@ -914,7 +931,7 @@ namespace Microsoft.NodejsTools.Intellisense {
             #endregion
 
             private void AnalyzeDirectoryWorker(string dir, bool addDir, CancellationToken cancel) {
-                if (_analyzer._jsAnalyzer == null) {
+                if (_analyzer.JsAnalyzer == null) {
                     // We aren't able to analyze code.
                     return;
                 }
@@ -926,7 +943,7 @@ namespace Microsoft.NodejsTools.Intellisense {
 
                 if (addDir) {
                     lock (_analyzer._contentsLock) {
-                        _analyzer._jsAnalyzer.AddAnalysisDirectory(dir);
+                        _analyzer.JsAnalyzer.AddAnalysisDirectory(dir);
                     }
                 }
 
@@ -1337,8 +1354,9 @@ namespace Microsoft.NodejsTools.Intellisense {
 
         #region Cached Analysis
 
-        private bool LoadCachedAnalysis(AnalysisLimits limits) {
+        private JsAnalyzer LoadCachedAnalysis(AnalysisLimits limits) {
             string analysisDb = GetAnalysisPath();
+            JsAnalyzer jsAnalyzer = null;
             if (File.Exists(analysisDb) && ShouldEnqueue()) {
                 FileStream stream = null;
                 bool disposeStream = true;
@@ -1366,7 +1384,7 @@ namespace Microsoft.NodejsTools.Intellisense {
                                         _reparseDateTime = new FileInfo(analysisDb).LastWriteTime;
 
                                         _analysisQueue = queue;
-                                        _jsAnalyzer = analyzer;
+                                        jsAnalyzer = analyzer;
 
                                         if (statusbar != null) {
                                             statusbar.SetText(SR.GetString(SR.StatusAnalysisLoaded));
@@ -1389,10 +1407,10 @@ namespace Microsoft.NodejsTools.Intellisense {
 
                                 // apply any changes 
                                 lock (_loadingDeltas) {
-                                    if (_jsAnalyzer == null) {
+                                    if (jsAnalyzer == null) {
                                         // we failed to load the cached analysis, create a new
                                         // analyzer now...
-                                        CreateNewAnalyzer(LoadLimits());
+                                        CreateNewAnalyzer(LoadLimits(_analysisLevel));
                                     }
 
                                     _fullyLoaded = true;
@@ -1403,7 +1421,7 @@ namespace Microsoft.NodejsTools.Intellisense {
                             }
                         }).HandleAllExceptions(SR.GetString(SR.NodejsToolsForVisualStudio)).DoNotWait();
                         disposeStream = false;
-                        return true;
+                        return jsAnalyzer;
                     }
                 } catch (IOException) {
                 } finally {
@@ -1412,7 +1430,7 @@ namespace Microsoft.NodejsTools.Intellisense {
                     }
                 }
             }
-            return false;
+            return null;
         }
 
         private static byte[] DbHeader {
@@ -1460,7 +1478,7 @@ namespace Microsoft.NodejsTools.Intellisense {
                         fs.Write(DbHeader, 0, DbHeader.Length);
                         try {
                             var serializer = new AnalysisSerializer();
-                            serializer.Serialize(fs, _jsAnalyzer);
+                            serializer.Serialize(fs, JsAnalyzer);
                         } catch (Exception e) {
                             Debug.Fail("Failed to save analysis " + e);
                             failed = true;
@@ -1488,11 +1506,11 @@ namespace Microsoft.NodejsTools.Intellisense {
         private const string AnalysisLimitsKey = @"Software\Microsoft\NodejsTools\" + AssemblyVersionInfo.VSVersion +
     @"\Analysis\Project";
 
-        private AnalysisLimits LoadLimits() {
+        private static AnalysisLimits LoadLimits(AnalysisLevel level) {
             AnalysisLimits defaults = null;
 
             if (NodejsPackage.Instance != null) {
-                switch (_analysisLevel) {
+                switch (level) {
                     case Options.AnalysisLevel.NodeLsMedium:
                         defaults = AnalysisLimits.MakeMediumAnalysisLimits();
                         break;

@@ -682,8 +682,7 @@ namespace Microsoft.NodejsTools.Project {
                 nestedModulesDepth = ModulesNode.NpmController.RootPackage.Modules.GetDepth(fileNode.Url);
             }
 
-            if (_analyzer != null && _analyzer.Project != null &&
-                _analyzer.Project.Limits.IsPathExceedNestingLimit(nestedModulesDepth)) {
+            if (_analyzer != null && _analyzer.Limits.IsPathExceedNestingLimit(nestedModulesDepth)) {
                 return false;
             }
 

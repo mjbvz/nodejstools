@@ -184,8 +184,8 @@ namespace Microsoft.NodejsTools.Intellisense {
                         }
                     } else {
                         string statsMessage = null;
-                        if (_analyzer._jsAnalyzer != null) {
-                            int count = _analyzer._jsAnalyzer.GetAndClearAnalysisCount();
+                        if (_analyzer.JsAnalyzer != null) {
+                            int count = _analyzer.JsAnalyzer.GetAndClearAnalysisCount();
                             if (count != 0) {
                                 var elapsedTime = TimeSpan.FromMilliseconds(watch.ElapsedMilliseconds - startTime);
                                 statsMessage = SR.GetString(SR.StatusAnalysisUpToDate, count, FormatTime(elapsedTime));
