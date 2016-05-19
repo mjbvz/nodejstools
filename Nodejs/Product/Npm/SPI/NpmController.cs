@@ -123,7 +123,7 @@ namespace Microsoft.NodejsTools.Npm.SPI {
                     }
                 }
 
-                RootPackage = RootPackageFactory.Create(
+                RootPackage = RootPackageFactory.CreateRootPackage(
                             _fullPathToRootPackageDirectory,
                             _showMissingDevOptionalSubPackages);
 

@@ -16,6 +16,8 @@
 
 namespace Microsoft.NodejsTools.Npm.SPI {
     internal class GlobalPackages : RootPackage, IGlobalPackages {
-        public GlobalPackages(string fullPathToRootDirectory) : base(fullPathToRootDirectory, false) { }
+        public GlobalPackages(string fullPathToRootDirectory, int maxDepth = 1) :
+            base(fullPathToRootDirectory, false, null, 0, maxDepth)
+        { }
     }
 }

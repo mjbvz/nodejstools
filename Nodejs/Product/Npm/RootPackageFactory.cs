@@ -18,7 +18,7 @@ using Microsoft.NodejsTools.Npm.SPI;
 
 namespace Microsoft.NodejsTools.Npm {
     public static class RootPackageFactory {
-        public static IRootPackage Create(
+        public static IRootPackage CreateRootPackage(
             string fullPathToRootDirectory,
             bool showMissingDevOptionalSubPackages = false) {
             return new RootPackage(
@@ -26,10 +26,8 @@ namespace Microsoft.NodejsTools.Npm {
                 showMissingDevOptionalSubPackages);
         }
 
-        public static IGlobalPackages Create(
-            string fullPathToGlobalPackages) {
-            return new GlobalPackages(
-                fullPathToGlobalPackages);
+        public static IGlobalPackages Create(string fullPathToGlobalPackages, int maxDepth = 1) {
+            return new GlobalPackages(fullPathToGlobalPackages, maxDepth);
         }
     }
 }

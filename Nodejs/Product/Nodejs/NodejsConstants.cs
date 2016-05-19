@@ -52,13 +52,8 @@ namespace Microsoft.NodejsTools {
         /// The name of the package.json file
         /// </summary>
         internal const string PackageJsonFile = "package.json";
-        internal const string PackageJsonMainFileKey = "main";
-        internal const string DefaultPackageMainFile = "index.js";
 
         internal const string BaseRegistryKey = "NodejsTools";
-
-        internal const string NodejsHiddenUserModule = "nodejs_tools_for_visual_studio_hidden_usermodule_";
-        internal const string NodejsHiddenUserModuleInstance = "nodejs_tools_for_visual_studio_hidden_module_instance_";
 
         internal const string TypeScriptCfgProperty = "CfgPropertyPagesGuidsAddTypeScript";
 

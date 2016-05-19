@@ -157,7 +157,7 @@ namespace NpmTests {
                 var rootDir = FilesystemPackageJsonTestHelpers.CreateRootPackage(manager, PkgSingleRecursiveDependency);
                 RunNpmInstall(rootDir);
 
-                var pkg = RootPackageFactory.Create(rootDir);
+                var pkg = RootPackageFactory.Create(rootDir, maxDepth: 100);
 
                 var json = pkg.PackageJson;
                 var dependencies = json.AllDependencies;
