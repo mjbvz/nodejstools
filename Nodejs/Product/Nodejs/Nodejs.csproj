@@ -122,6 +122,10 @@
     <Reference Include="Microsoft.VisualStudio.TextManager.Interop.12.0, Version=12.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
+    <Reference Include="Microsoft.VisualStudio.Workspaces.Contracts, Version=14.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Microsoft.VisualStudio.Workspaces.14.0.60126-pre-g88e0768db1\lib\net46\Microsoft.VisualStudio.Workspaces.Contracts.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="stdole, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
@@ -265,6 +269,8 @@
     <Compile Include="Commands\SurveyNewsCommand.cs" />
     <Compile Include="Debugger\DataTips\DataTipTextManagerEvents.cs" />
     <Compile Include="Debugger\DebugEngine\AD7EvalErrorProperty.cs" />
+    <None Include="app.config" />
+    <Compile Include="Debugger\NodeDebugProvider.cs" />
     <Compile Include="Logging\LiveLogger.cs" />
     <Compile Include="Debugger\FilePosition.cs" />
     <Compile Include="Debugger\FuzzyLogicFileNameMapper.cs" />
