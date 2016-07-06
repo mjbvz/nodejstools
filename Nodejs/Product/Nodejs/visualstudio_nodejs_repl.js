@@ -15,11 +15,6 @@
 //*********************************************************//
 "use strict";
 
-if (process.argv.length <= 2) {
-    console.log('Repl requires port number to connect to');
-    process.exit(1);
-}
-
 var path = require('path');
 
 // setup our filename and search paths to match how they would if the user
@@ -57,10 +52,7 @@ function findEndOfHeaders(buf) {
     return -1;
 }
 
-
-var net = require("net");
-
-var client = net.connect(+process.argv[2], '127.0.0.1', function () { });
+var client;
 
 function stdstream(isError) {
     this.writable = true;
@@ -79,12 +71,6 @@ function stdstream(isError) {
     }
 }
 
-// need to delete so we can replace...
-delete process.stdout;
-delete process.stderr;
-process.stdout = new stdstream(false);
-process.stderr = new stdstream(true);
-
 var util = require('util');
 var outerGlobal = this;
 var vm = require('vm');
@@ -100,7 +86,7 @@ util.inspect.colors['blue'] = [94, 39];
 
 var evalPrefix = "'use strict'; undefined;"
 
-function processRequest(command) {
+var processRequest = module.exports.processRequest = function(command) {
     switch (command["type"]) {
         case "execute":
             // eval against the global object, in node this is process
@@ -123,27 +109,46 @@ function processRequest(command) {
                         }
                     }
                 }
-                
                 var result = util.inspect(obj, undefined, undefined, true);
-                send_response(client, { 'type': 'execute', 'result': result });
+                return { 'type': 'execute', 'result': result };
             } catch (err) {
                 if (err === null || err == undefined) {
                     var result = util.inspect(undefined, undefined, undefined, true);
                     send_response(client, { 'type': 'execute', 'result': result });
                 } else {
-                    send_response(client, { 'type': 'execute', 'error': err.toString() });
+                    return { 'type': 'execute', 'error': err.toString() };
                 }
 
             }
             break;
         case "clear":
-            context = {};
+            context = vm.createContext(global);
             break;
         default:
             console.log("Unknown command: " + command["type"]);
             break;
     }
 }
+
+
+if (require.main !== module) {
+    return;
+}
+
+if (process.argv.length <= 2) {
+    console.log('Repl requires port number to connect to');
+    process.exit(1);
+}
+
+// need to delete so we can replace...
+delete process.stdout;
+delete process.stderr;
+process.stdout = new stdstream(false);
+process.stderr = new stdstream(true);
+
+var net = require("net");
+
+client = net.connect(+process.argv[2], '127.0.0.1', function () { });
 
 var reader_state = { 'prevData': Buffer(0), 'state': 'header' }
 
