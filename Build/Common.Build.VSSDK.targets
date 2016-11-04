@@ -223,7 +223,7 @@
                       Files="@(_VSIXSourceItems)"
                       ZipPackage="$(_Container)"
                       CompressionLevel="$(ZipPackageCompressionLevel)"
-                      ItemsToConsider="@(None)">
+                      ItemsToConsider="%(VSIX.SourceDir)**\*">
         <Output TaskParameter="ZipPackage" ItemName="FileWrites" />
     </CreateZipPackage>
 
